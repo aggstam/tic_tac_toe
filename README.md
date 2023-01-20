@@ -18,3 +18,5 @@ On different terminals, we start two clients:
 % ./TrilizaC
 ```
 Enjoy the game!
+
+TODO: it used to work but now it doesn't, will fix it sometime.
