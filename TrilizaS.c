@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <cnaiapi.h>
+
 #define BUFFSIZE 256
 #define BOARDSIZE 59
 #define RECEIVED_PROMPT    "Received> "

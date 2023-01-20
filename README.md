@@ -1,5 +1,6 @@
 # tic_tac_toe
-Simple Tic Tac Toe game between two players(clients) connected to a server.
+Simple Tic Tac Toe game between two players(clients) connected to a server,
+using Douglas E. Comer's **[CNAI](https://netbook.cs.purdue.edu)** Socket API.
 
 # Usage
 ## Compilation
@@ -10,10 +11,10 @@ Simple Tic Tac Toe game between two players(clients) connected to a server.
 ## Execution
 First we start the server:
 ```
-% ./server
+% ./TrilizaS
 ```
 On different terminals, we start two clients:
 ```
-% ./client
+% ./TrilizaC
 ```
 Enjoy the game!

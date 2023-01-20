@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <cnaiapi.h>
 #include <time.h>
+#include <unistd.h>
+#include <cnaiapi.h>
 
 #define BUFFSIZE 256
 #define INPUT_PROMPT "Input   > "
