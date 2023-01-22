@@ -1,137 +1,43 @@
+// -------------------------------------------------------------
+//
+// Simple Tic Tac Toe game between two players(clients) connected to a server,
+// using Douglas E. Comer's CNAI Socket API.
+// This code implements the server.
+//
+// Author: Aggelos Stamatiou, December 2015
+//
+// --------------------------------------------------------------
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <cnaiapi.h>
 
-#define BUFFSIZE 256
-#define BOARDSIZE 59
-#define RECEIVED_PROMPT    "Received> "
+// Execution constants
+#define BUFFSIZE        256
+#define BOARDSIZE       59
+#define RECEIVED_PROMPT "Received> "
 
-void create_board(char board[BOARDSIZE]);
-void send_board(connection conn, char board[BOARDSIZE]);
-char receive_choice(connection conn);
-void put_choice_on_board(char board[BOARDSIZE], char choice, char c);
-int check_for_winner(char board[BOARDSIZE]);
-void send_results(connection conn, char p);
-int send_int(connection conn, int k);
-int is_correct(char, char board[BOARDSIZE]);
-
-int main(int argc, char *argv[]) {
-    char pX = '-';
-    char pY = '-';
-    char c = 'X';
-    char choice;
-    char board[BOARDSIZE];
-    int turn = 0;
+// Send an integer to a connection.
+// Inputs:
+//      connection conn: Connnection to send to
+//      int k: Integer to sent
+int send_int(connection conn, int k) {
     char buff[BUFFSIZE];
-    connection    conn0;
-    connection    conn1;
-    connection    connX;
-    connection    connY;
-    appnum a = 20000;
-
-    printf("Game Server Waiting For Connections.\n");
-
-    conn0 = await_contact(a);
-    if (conn0 < 0)
-        exit(1);
-    connX = conn0;
-    int id = 0;
-    send_int(connX, id);
-    printf("First Player Connection Established.\n");
-
-    printf("Game Server Waiting For Second Player.\n");
-
-    conn1 = await_contact(a);
-    if (conn1 < 0)
-        exit(1);
-    connY = conn1;
-    id = 1;
-    send_int(connY, id);
-    printf("Second Player Connection Established.\n");
-
-    create_board(board);
-
-    send_board(connY, board);
-
-    send_int(connX, turn);
-    while (turn < 9) {
-        send_board(connX, board);
-
-        int ic = 0;
-        send_int(connX, ic);
-        while (ic == 0) {
-            choice = receive_choice(connX);
-            ic = is_correct(choice, board);
-            send_int(connX, ic);
-        }
-        if (ic == -1) {
-            turn = 20;
-            break;
-        }
-
-        put_choice_on_board(board, choice, c);
-        send_board(connX, board);
-        if ((turn == 0) || (turn == 2) || (turn == 4) || (turn == 6) || (turn == 8))
-        {
-            connX = conn1;
-            connY = conn0;
-            c = 'O';
-        }
-        else
-        {
-            connX = conn0;
-            connY = conn1;
-            c = 'X';
-        }
-        if (check_for_winner(board) == 1) {
-            if ((turn == 0) || (turn == 2) || (turn == 4) || (turn == 6) || (turn == 8)) {
-                pX = 'L';
-                pY = 'W';
-            }
-            else {
-                pY = 'W';
-                pX = 'L';
-            }
-
-            break;
-        }
-        turn = turn + 1;
-        if (send_int(connX, turn) == -1) {
-            turn = 21;
-            break;
-        }
+    buff[0] = k + '0';
+    buff[1] = '\0';
+    fflush(stdout);
+    if (send(conn, buff, 2, 0) != -1) {
+        return 1;
     }
-    if (turn == 20 || turn == 21) {
-        send_int(connY, turn);
-    }
-    else {
-        if (turn != 9) {
-            turn = 9;
-            send_int(connX, turn);
-            send_int(connY, turn);
-        }
-        else {
-            if (check_for_winner(board) == 1) {
-                pY = 'W';
-                pX = 'L';
-            }
-            send_int(connY, turn);
-        }
 
-        send_board(connX, board);
-        send_board(connY, board);
-        send_results(connX, pX);
-        send_results(connY, pY);
-        send_eof(connX);
-        send_eof(connY);
-        printf("\nGame Connection Closed.\n\n");
-    }
-    return 0;
+    return -1;
 }
 
+// Auxillary function to generate a new game board.
+// Inputs:
+//      char board[BOARDSIZE]: Board to generate
 void create_board(char board[BOARDSIZE]) {
-
     board[0] = '\n';
     board[1] = ' ';
     board[2] = '0';
@@ -191,225 +97,311 @@ void create_board(char board[BOARDSIZE]) {
     board[56] = '8';
     board[57] = '\n';
     board[58] = '\0';
-
 }
 
+// Send an board to a connection.
+// Inputs:
+//      connection conn: Connnection to send to
+//      char board[BOARDSIZE]: board to sent
 void send_board(connection conn, char board[BOARDSIZE]) {
-    int i;
     int len = BOARDSIZE;
     char buff[BUFFSIZE];
-
     fflush(stdout);
-    for (i = 0; i < BOARDSIZE; i++) {
+    for (int i = 0; i < BOARDSIZE; i++) {
         buff[i] = board[i];
     }
     write(STDOUT_FILENO, buff, len);
     send(conn, buff, len, 0);
-
 }
 
+// Receive a choice from connection.
+// Inputs:
+//      connection conn: Connnection to receive from
+// Output:
+//      char --> Received choice
 char receive_choice(connection conn) {
-    int len;
-    char buff[BUFFSIZE];
-
     printf(RECEIVED_PROMPT);
+    char buff[BUFFSIZE];
+    int len = recv(conn, buff, BUFFSIZE, 0);
     fflush(stdout);
-    len = recv(conn, buff, BUFFSIZE, 0);
     write(STDOUT_FILENO, buff, len);
     return buff[0];
-
 }
 
+// Check if provided choice/move is valid for the provided board
+// Inputs:
+//      char choice: Choice to check
+//      char board[BOARDSIZE]: Current board
+// Output:
+//      1 --> Valid
+//      0 --> Already chosen
+//     -1 --> Out of bounds
+int is_correct(char choice, char board[BOARDSIZE]) {
+    // Check choice is a valid board position
+    if (choice != '0' && choice != '1' && choice != '2'
+        && choice != '3' && choice != '4' && choice != '5'
+        && choice != '6' && choice != '7' && choice != '8') {
+        return -1;
+    }
+
+    // Get choice position index
+    int index = 2;
+    if (choice == '1') {
+        index = 6;
+    } else if (choice == '2') {
+        index = 10;
+    } else if (choice == '3') {
+        index = 25;
+    } else if (choice == '4') {
+        index = 29;
+    } else if (choice == '5') {
+        index = 33;
+    } else if (choice == '6') {
+        index = 48;
+    } else if (choice == '7') {
+        index = 52;
+    } else if (choice == '8') {
+        index = 56;
+    }
+
+    // Check choice validity based on current board state
+    if (board[index] == 'O' || board[index] == 'X') {
+        return 0;
+    }
+
+    return 1;
+}
+
+// Set provided choice to its corresponding spot in the board
+// Inputs:
+//      char board[BOARDSIZE]: Current board
+//      char choice: Choice to check
+//      char c: Chosen value
 void put_choice_on_board(char board[BOARDSIZE], char choice, char c) {
-    if (choice == '0')
+    if (choice == '0') {
         board[2] = c;
-    if (choice == '1')
+    } else if (choice == '1') {
         board[6] = c;
-    if (choice == '2')
+    } else if (choice == '2') {
         board[10] = c;
-    if (choice == '3')
+    } else if (choice == '3') {
         board[25] = c;
-    if (choice == '4')
+    } else if (choice == '4') {
         board[29] = c;
-    if (choice == '5')
+    } else if (choice == '5') {
         board[33] = c;
-    if (choice == '6')
+    } else if (choice == '6') {
         board[48] = c;
-    if (choice == '7')
+    } else if (choice == '7') {
         board[52] = c;
-    if (choice == '8')
+    } else if (choice == '8') {
         board[56] = c;
-
+    }
 }
 
+// Check if provided board has a winner
+// Inputs:
+//      char board[BOARDSIZE]: Current board
+// Output:
+//      1 --> Winner exists
+//      0 --> No winner
+//     -1 --> Out of bounds
 int check_for_winner(char board[BOARDSIZE]) {
-
-    if (board[2] == board[6] && board[6] == board[10])
-        return 1;
-    if (board[25] == board[29] && board[29] == board[33])
-        return 1;
-    if (board[48] == board[52] && board[52] == board[56])
-        return 1;
-    if (board[2] == board[25] && board[25] == board[48])
-        return 1;
-    if (board[6] == board[29] && board[29] == board[52])
-        return 1;
-    if (board[10] == board[33] && board[33] == board[56])
-        return 1;
-    if (board[2] == board[29] && board[29] == board[56])
-        return 1;
-    if (board[10] == board[29] && board[29] == board[48])
-        return 1;
-
-    return 0;
+    return (board[2] == board[6] && board[6] == board[10])
+            || (board[25] == board[29] && board[29] == board[33])
+            || (board[48] == board[52] && board[52] == board[56])
+            || (board[2] == board[25] && board[25] == board[48])
+            || (board[6] == board[29] && board[29] == board[52])
+            || (board[10] == board[33] && board[33] == board[56])
+            || (board[2] == board[29] && board[29] == board[56])
+            || (board[10] == board[29] && board[29] == board[48]);
 }
 
+// Send results to a connection.
+// Inputs:
+//      connection conn: Connnection to send to
+//      char p: Outcome
 void send_results(connection conn, char p) {
-    int i;
+    int len;
     char buff[BUFFSIZE];
-
-    char wm[9];
-    wm[0] = 'Y';
-    wm[1] = 'o';
-    wm[2] = 'u';
-    wm[3] = ' ';
-    wm[4] = 'w';
-    wm[5] = 'o';
-    wm[6] = 'n';
-    wm[7] = '!';
-    wm[8] = '\0';
-
-    char lm[10];
-    lm[0] = 'Y';
-    lm[1] = 'o';
-    lm[2] = 'u';
-    lm[3] = ' ';
-    lm[4] = 'l';
-    lm[5] = 'o';
-    lm[6] = 's';
-    lm[7] = 't';
-    lm[8] = '.';
-    lm[9] = '\0';
-
-    char is[6];
-    is[0] = 'D';
-    is[1] = 'r';
-    is[2] = 'a';
-    is[3] = 'w';
-    is[4] = '.';
-    is[5] = '\0';
-
     fflush(stdout);
     if (p == 'W') {
-        for (i = 0; i < 9; i++) {
-            buff[i] = wm[i];
-        }
+        buff[0] = 'Y';
+        buff[1] = 'o';
+        buff[2] = 'u';
+        buff[3] = ' ';
+        buff[4] = 'w';
+        buff[5] = 'o';
+        buff[6] = 'n';
+        buff[7] = '!';
+        buff[8] = '\0';
+        len = 9;
+    }  else if (p == 'L') {
+        buff[0] = 'Y';
+        buff[1] = 'o';
+        buff[2] = 'u';
+        buff[3] = ' ';
+        buff[4] = 'l';
+        buff[5] = 'o';
+        buff[6] = 's';
+        buff[7] = 't';
+        buff[8] = '.';
+        buff[9] = '\0';
+        len = 10;
+    } else {
+        buff[0] = 'D';
+        buff[1] = 'r';
+        buff[2] = 'a';
+        buff[3] = 'w';
+        buff[4] = '.';
+        buff[5] = '\0';
+        len = 6;
     }
-    else if (p == 'L') {
-        for (i = 0; i < 10; i++) {
-            buff[i] = lm[i];
-        }
-    }
-    else {
-        for (i = 0; i < 6; i++) {
-            buff[i] = is[i];
-        }
-    }
-    send(conn, buff, i, 0);
 
+    send(conn, buff, len, 0);
 }
 
-int send_int(connection conn, int k) {
-    char    buff[BUFFSIZE];
+int main(int argc, char *argv[]) {
+    char pX = '-';
+    char pY = '-';
+    char c = 'X';
+    char choice;
+    char board[BOARDSIZE];
+    int turn = 0;
+    int ic = 0;
+    char buff[BUFFSIZE];
+    connection conn0, conn1, connX, connY;
+    appnum a = 20000;
 
-    buff[0] = k + '0';
-    buff[1] = '\0';
-    (void)fflush(stdout);
-    if (send(conn, buff, 2, 0) != -1) {
-        return 1;
-    }
-    else
-        return -1;
-}
-
-int is_correct(char choice, char board[BOARDSIZE]) {
-    if (choice == '0' || choice == '1' || choice == '2' || choice == '3' || choice == '4' || choice == '5' || choice == '6' || choice == '7' || choice == '8') {
-        if (choice == '0') {
-            if (board[2] == 'O' || board[2] == 'X') {
-                return 0;
-            }
-            else {
-                return 1;
-            }
-        }
-        if (choice == '1') {
-            if (board[6] == 'O' || board[6] == 'X') {
-                return 0;
-            }
-            else {
-                return 1;
-            }
-        }
-        if (choice == '2') {
-            if (board[10] == 'O' || board[10] == 'X') {
-                return 0;
-            }
-            else {
-                return 1;
-            }
-        }
-        if (choice == '3') {
-            if (board[25] == 'O' || board[25] == 'X') {
-                return 0;
-            }
-            else {
-                return 1;
-            }
-        }
-        if (choice == '4') {
-            if (board[29] == 'O' || board[29] == 'X') {
-                return 0;
-            }
-            else {
-                return 1;
-            }
-        }
-        if (choice == '5') {
-            if (board[33] == 'O' || board[33] == 'X') {
-                return 0;
-            }
-            else {
-                return 1;
-            }
-        }
-        if (choice == '6') {
-            if (board[48] == 'O' || board[48] == 'X') {
-                return 0;
-            }
-            else {
-                return 1;
-            }
-        }
-        if (choice == '7') {
-            if (board[52] == 'O' || board[52] == 'X') {
-                return 0;
-            }
-            else {
-                return 1;
-            }
-        }
-        if (choice == '8') {
-            if (board[56] == 'O' || board[56] == 'X') {
-                return 0;
-            }
-            else {
-                return 1;
-            }
-        }
-
-    }
-    else {
-        return -1;
+    // Wait for clients to connect
+    printf("Game Server Waiting For Connections.\n");
+    conn0 = await_contact(a);
+    if (conn0 < 0) {
+        exit(1);
     }
 
+    // Inform first client for successfull connection
+    connX = conn0;
+    int id = 0;
+    send_int(connX, id);
+    printf("First Player Connection Established.\n");
+
+    // Wait second client
+    printf("Game Server Waiting For Second Player.\n");
+    conn1 = await_contact(a);
+    if (conn1 < 0) {
+        exit(1);
+    }
+
+    // Inform second client for successfull connection
+    connY = conn1;
+    id = 1;
+    send_int(connY, id);
+    printf("Second Player Connection Established.\n");
+
+    // Genrate game board
+    create_board(board);
+
+    // Send board to second client
+    send_board(connY, board);
+
+    // Inform first client that its turn has started
+    send_int(connX, turn);
+
+    // Play the game
+    while (turn < 9) {
+        // Send current player the board
+        send_board(connX, board);
+
+        // Check their connection status
+        send_int(connX, ic);
+
+        // While they are connected
+        while (ic == 0) {
+            // Receive their choice
+            choice = receive_choice(connX);
+
+            // Check if its valid
+            ic = is_correct(choice, board);
+
+            // Send confirmation
+            send_int(connX, ic);
+        }
+
+        // Check if responded on time
+        if (ic == -1) {
+            turn = 20;
+            break;
+        }
+
+        // Redraw board
+        put_choice_on_board(board, choice, c);
+
+        // Send new board to current player
+        send_board(connX, board);
+
+        // Switch current player
+        if ((turn == 0) || (turn == 2) || (turn == 4) || (turn == 6) || (turn == 8)) {
+            connX = conn1;
+            connY = conn0;
+            c = 'O';
+        } else {
+            connX = conn0;
+            connY = conn1;
+            c = 'X';
+        }
+
+        // Check if board has a winner
+        if (check_for_winner(board) == 1) {
+            // Set winner
+            if ((turn == 0) || (turn == 2) || (turn == 4) || (turn == 6) || (turn == 8)) {
+                pX = 'L';
+                pY = 'W';
+            } else {
+                pY = 'W';
+                pX = 'L';
+            }
+
+            break;
+        }
+
+        // Send new turn signal to current player
+        turn = turn + 1;
+        if (send_int(connX, turn) == -1) {
+            turn = 21;
+            break;
+        }
+    }
+
+    // Check if current client failed, to inform the other
+    if (turn == 20 || turn == 21) {
+        send_int(connY, turn);
+        return 0;
+    }
+
+    // Notify clients to stop
+    if (turn != 9) {
+        turn = 9;
+        send_int(connX, turn);
+        send_int(connY, turn);
+    } else {
+        // Check results
+        if (check_for_winner(board) == 1) {
+            pY = 'W';
+            pX = 'L';
+        }
+        send_int(connY, turn);
+    }
+
+    // Broadcast final bard and results
+    send_board(connX, board);
+    send_board(connY, board);
+    send_results(connX, pX);
+    send_results(connY, pY);
+
+    // Terminate connections
+    send_eof(connX);
+    send_eof(connY);
+
+    printf("\nGame Connection Closed.\n\n");
 }
