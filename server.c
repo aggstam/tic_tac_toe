@@ -16,22 +16,57 @@
 // Execution constants
 #define BUFFSIZE        256
 #define BOARDSIZE       59
+#define SEND_PROMPT     "Sending> "
 #define RECEIVED_PROMPT "Received> "
+
+// Auxillary function to receive message acknowledgement from a connection.
+// Inputs:
+//      connection conn: Connnection to receive from
+void receive_acknowledgement(connection conn) {
+    char buff[BUFFSIZE];
+    fflush(stdout);
+    int len = recv(conn, buff, BUFFSIZE, 0);
+    fflush(stdout);
+    printf("%s%c%c\n", RECEIVED_PROMPT, buff[0], buff[1]);
+    if (buff[0] != 'O' && buff[0] != 'K'){
+        printf("Send failed!\n");
+        exit(1);
+    }
+}
 
 // Send an integer to a connection.
 // Inputs:
 //      connection conn: Connnection to send to
 //      int k: Integer to sent
+// Output:
+//      0 --> Execution was successfully
+//     -1 --> Error durring execution
 int send_int(connection conn, int k) {
     char buff[BUFFSIZE];
     buff[0] = k + '0';
     buff[1] = '\0';
+    printf("%s%c\n", SEND_PROMPT, buff[0]);
     fflush(stdout);
-    if (send(conn, buff, 2, 0) != -1) {
-        return 1;
+    if (send(conn, buff, 2, 0) == -1) {
+        return -1;
     }
+    receive_acknowledgement(conn);
+}
 
-    return -1;
+// Send an board to a connection.
+// Inputs:
+//      connection conn: Connnection to send to
+//      char board[BOARDSIZE]: board to sent
+void send_board(connection conn, char board[BOARDSIZE]) {
+    printf("%s%s\n", SEND_PROMPT, board);
+    int len = BOARDSIZE;
+    char buff[BUFFSIZE];
+    fflush(stdout);
+    for (int i = 0; i < BOARDSIZE; i++) {
+        buff[i] = board[i];
+    }
+    send(conn, buff, len, 0);
+    receive_acknowledgement(conn);
 }
 
 // Auxillary function to generate a new game board.
@@ -99,21 +134,6 @@ void create_board(char board[BOARDSIZE]) {
     board[58] = '\0';
 }
 
-// Send an board to a connection.
-// Inputs:
-//      connection conn: Connnection to send to
-//      char board[BOARDSIZE]: board to sent
-void send_board(connection conn, char board[BOARDSIZE]) {
-    int len = BOARDSIZE;
-    char buff[BUFFSIZE];
-    fflush(stdout);
-    for (int i = 0; i < BOARDSIZE; i++) {
-        buff[i] = board[i];
-    }
-    write(STDOUT_FILENO, buff, len);
-    send(conn, buff, len, 0);
-}
-
 // Receive a choice from connection.
 // Inputs:
 //      connection conn: Connnection to receive from
@@ -122,9 +142,9 @@ void send_board(connection conn, char board[BOARDSIZE]) {
 char receive_choice(connection conn) {
     printf(RECEIVED_PROMPT);
     char buff[BUFFSIZE];
-    int len = recv(conn, buff, BUFFSIZE, 0);
     fflush(stdout);
-    write(STDOUT_FILENO, buff, len);
+    int len = recv(conn, buff, BUFFSIZE, 0);
+    printf("%s%c\n", RECEIVED_PROMPT, buff[0]);
     return buff[0];
 }
 
@@ -226,36 +246,39 @@ void send_results(connection conn, char p) {
     char buff[BUFFSIZE];
     fflush(stdout);
     if (p == 'W') {
-        buff[0] = 'Y';
-        buff[1] = 'o';
-        buff[2] = 'u';
-        buff[3] = ' ';
-        buff[4] = 'w';
-        buff[5] = 'o';
-        buff[6] = 'n';
-        buff[7] = '!';
-        buff[8] = '\0';
-        len = 9;
-    }  else if (p == 'L') {
-        buff[0] = 'Y';
-        buff[1] = 'o';
-        buff[2] = 'u';
-        buff[3] = ' ';
-        buff[4] = 'l';
-        buff[5] = 'o';
-        buff[6] = 's';
-        buff[7] = 't';
-        buff[8] = '.';
+        buff[0] = '\n';
+        buff[1] = 'Y';
+        buff[2] = 'o';
+        buff[3] = 'u';
+        buff[4] = ' ';
+        buff[5] = 'w';
+        buff[6] = 'o';
+        buff[7] = 'n';
+        buff[8] = '!';
         buff[9] = '\0';
         len = 10;
+    }  else if (p == 'L') {
+        buff[0] = '\n';
+        buff[1] = 'Y';
+        buff[2] = 'o';
+        buff[3] = 'u';
+        buff[4] = ' ';
+        buff[5] = 'l';
+        buff[6] = 'o';
+        buff[7] = 's';
+        buff[8] = 't';
+        buff[9] = '.';
+        buff[10] = '\0';
+        len = 11;
     } else {
-        buff[0] = 'D';
-        buff[1] = 'r';
-        buff[2] = 'a';
-        buff[3] = 'w';
-        buff[4] = '.';
-        buff[5] = '\0';
-        len = 6;
+        buff[0] = '\n';
+        buff[1] = 'D';
+        buff[2] = 'r';
+        buff[3] = 'a';
+        buff[4] = 'w';
+        buff[5] = '.';
+        buff[6] = '\0';
+        len = 7;
     }
 
     send(conn, buff, len, 0);
@@ -282,8 +305,7 @@ int main(int argc, char *argv[]) {
 
     // Inform first client for successfull connection
     connX = conn0;
-    int id = 0;
-    send_int(connX, id);
+    send_int(connX, 0);
     printf("First Player Connection Established.\n");
 
     // Wait second client
@@ -295,8 +317,7 @@ int main(int argc, char *argv[]) {
 
     // Inform second client for successfull connection
     connY = conn1;
-    id = 1;
-    send_int(connY, id);
+    send_int(connY, 1);
     printf("Second Player Connection Established.\n");
 
     // Genrate game board
@@ -313,17 +334,15 @@ int main(int argc, char *argv[]) {
         // Send current player the board
         send_board(connX, board);
 
-        // Check their connection status
-        send_int(connX, ic);
-
         // While they are connected
+        ic = 0;
+        send_int(connX, ic);
         while (ic == 0) {
             // Receive their choice
             choice = receive_choice(connX);
 
             // Check if its valid
             ic = is_correct(choice, board);
-
             // Send confirmation
             send_int(connX, ic);
         }
@@ -403,5 +422,7 @@ int main(int argc, char *argv[]) {
     send_eof(connX);
     send_eof(connY);
 
-    printf("\nGame Connection Closed.\n\n");
+    printf("\nGame Connection Closed.\n");
+
+    return 0;
 }

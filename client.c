@@ -16,7 +16,6 @@
 
 // Execution constants
 #define BUFFSIZE        256
-#define INPUT_PROMPT    "Input   > "
 #define RECEIVED_PROMPT "Received> "
 int len;
 char buff[BUFFSIZE];
@@ -39,6 +38,18 @@ void get_conf(computer* comp, appnum* a) {
     *a = (appnum)atoi(appname);
 }
 
+// Auxillary function to send message acknowledgement to a connection.
+// Inputs:
+//      connection conn: Connnection to send to
+void send_acknowledgement(connection conn) {
+    char buff[BUFFSIZE];
+    fflush(stdout);
+    buff[0] = 'O';
+    buff[1] = 'K';
+    buff[2] = '\0';
+    send(conn, buff, 2, 0);
+}
+
 // Receive an integer from connection.
 // Inputs:
 //      connection conn: Connnection to receive from
@@ -48,18 +59,23 @@ int receive_int(connection conn) {
     char buff[BUFFSIZE];
     fflush(stdout);
     int len = recv(conn, buff, BUFFSIZE, 0);
-    return buff[0] - '0';
+    int received = buff[0] - '0';
+    printf("%s{int} %d\n", RECEIVED_PROMPT, received);
+    send_acknowledgement(conn);
+    return received;
 }
 
-// Receive board from connection.
+// Receive buffer from connection.
 // Inputs:
 //      connection conn: Connnection to receive from
-void receive_board(connection conn) {
-    printf(RECEIVED_PROMPT);
+void receive_buffer(connection conn) {
     char buff[BUFFSIZE];
+    printf("%s{buffer}", RECEIVED_PROMPT);
+    fflush(stdout);
     int len = recv(conn, buff, BUFFSIZE, 0);
     fflush(stdout);
     write(STDOUT_FILENO, buff, len);
+    send_acknowledgement(conn);
 }
 
 // Send provided connection.
@@ -70,13 +86,14 @@ void receive_board(connection conn) {
 //     -1 --> Error durring execution
 int send_choice(connection conn){
     char buff[BUFFSIZE];
-    int len;
+    int len, resp;
     time_t begin;
     time_t end;
 
-    while (1) {
+    resp = receive_int(conn);
+    while (resp == 0) {
         // Retrieve choice
-        printf(INPUT_PROMPT);
+        printf("Input> ");
         begin = time(NULL);
         fflush(stdout);
         len = readln(buff, BUFFSIZE);
@@ -84,10 +101,14 @@ int send_choice(connection conn){
         // Check length and time
         if ((len > 0) && ((end - begin) < 60)){
             // Send choice
-            send(conn, buff, len, 0);
+            if (send(conn, buff, len, 0) == -1) {
+                return -1;
+            }
             // Wait response
-            if (receive_int(conn) != 0) {
-                break;
+            resp = receive_int(conn);
+            if (resp == 0) {
+                printf("Chose another board number, that's already filled.\n");
+                continue;
             }
         } else {
             buff[0] = 'O';
@@ -101,24 +122,13 @@ int send_choice(connection conn){
             buff[8] = 'I';
             buff[9] = 'M';
             buff[10] = 'E';
-            send(conn, buff, 11, 0);
+            buff[11] = '\0';
+            send(conn, buff, 12, 0);
             return -1;
         }
-
-        printf("Chose another board number, that's already filled.\n");
     }
 
     return 0;
-}
-
-// Receive results from connection.
-// Inputs:
-//      connection conn: Connnection to receive from
-void receive_results(connection conn) {
-    char buff[BUFFSIZE];
-    int len = recv(conn, buff, BUFFSIZE, 0);
-    fflush(stdout);
-    write(STDOUT_FILENO, buff, len);
 }
 
 int main(int argc, char* argv[]) {
@@ -143,19 +153,24 @@ int main(int argc, char* argv[]) {
     if (id == 0) {
         printf("Waiting for second player.\n");
     } else if (id == 1) {
-        receive_board(conn);
+        receive_buffer(conn);
+        printf("Waiting for other player...\n");
     }
 
     // Wait until turn starts
     turn = receive_int(conn);
     while (turn < 9) {
-        receive_board(conn);
+        printf("Turn signal received: %d\n", turn);
+        receive_buffer(conn);
+
         printf("Chose a board number to put your move.\n");
-        if (send_choice(conn)) {
+        if (send_choice(conn) == -1) {
             turn = 10;
             break;
         }
-        receive_board(conn);
+
+        receive_buffer(conn);
+        printf("Waiting for other player...\n");
         turn = receive_int(conn);
     }
 
@@ -170,13 +185,13 @@ int main(int argc, char* argv[]) {
         }
     } else {
         // Receive final board and results
-        receive_board(conn);
-        receive_results(conn);
-        send_eof(conn);
+        receive_buffer(conn);
+        receive_buffer(conn);
     }
 
-    printf("\nGame Connection Closed.\n\n");
+    send_eof(conn);
+
+    printf("\nGame Connection Closed.\n");
 
     return 0;
-
 }

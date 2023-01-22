@@ -18,5 +18,3 @@ On different terminals, we start two clients:
 % ./client
 ```
 Enjoy the game!
-
-TODO: it used to work but now it doesn't, will fix it sometime.
