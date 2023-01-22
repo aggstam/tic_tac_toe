@@ -1,8 +1,8 @@
 all:
-	gcc -Wno-implicit-function-declaration -c -I h/ -L api/cnaiapi.o TrilizaC.c
-	gcc -I h/ api/cnaiapi.o api/readln.o TrilizaC.o -o TrilizaC
-	gcc -Wno-implicit-function-declaration -c -I h/ -L api/cnaiapi.o TrilizaS.c
-	gcc -I h/ api/cnaiapi.o TrilizaS.o -o TrilizaS
+	gcc -Wno-implicit-function-declaration -c -I h/ -L api/cnaiapi.o client.c
+	gcc -I h/ api/cnaiapi.o api/readln.o client.o -o client
+	gcc -Wno-implicit-function-declaration -c -I h/ -L api/cnaiapi.o server.c
+	gcc -I h/ api/cnaiapi.o server.o -o server
 
 clean:
-	rm -f TrilizaC TrilizaC.o TrilizaS TrilizaS.O
+	rm -f client client.o server server.O

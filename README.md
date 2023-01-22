@@ -11,11 +11,11 @@ using Douglas E. Comer's **[CNAI](https://netbook.cs.purdue.edu)** Socket API.
 ## Execution
 First we start the server:
 ```
-% ./TrilizaS
+% ./server
 ```
 On different terminals, we start two clients:
 ```
-% ./TrilizaC
+% ./client
 ```
 Enjoy the game!
 

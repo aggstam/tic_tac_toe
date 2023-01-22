@@ -1,4 +1,4 @@
-TrilizaC
-TrilizaC.o
-TrilizaS
-TrilizaS.o
+client
+client.o
+server
+server.o
