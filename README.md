@@ -2,13 +2,13 @@
 Simple Tic Tac Toe game between two players(clients) connected to a server,
 using Douglas E. Comer's **[CNAI](https://netbook.cs.purdue.edu)** Socket API.
 
-# Usage
-## Compilation
+## Usage
+### Compilation
 ```
 % make
 ```
 
-## Execution
+### Execution
 First we start the server:
 ```
 % ./server
