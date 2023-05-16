@@ -6,3 +6,5 @@ all:
 
 clean:
 	rm -f client client.o server server.O
+
+.PHONY: all clean
