@@ -4,17 +4,17 @@ using Douglas E. Comer's **[CNAI](https://netbook.cs.purdue.edu)** Socket API.
 
 ## Usage
 ### Compilation
-```
-% make
+```shell
+$ make
 ```
 
 ### Execution
 First we start the server:
-```
-% ./server
+```shell
+$ ./server
 ```
 On different terminals, we start two clients:
-```
-% ./client
+```shell
+$ ./client
 ```
 Enjoy the game!
